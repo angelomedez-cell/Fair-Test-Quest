@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fair Test Quest</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --ui-bg: #1e1e2e;
+            --ui-border: #cdd6f4;
+            --ui-text: #cdd6f4;
+            --primary: #89b4fa;
+            --success: #a6e3a1;
+            --danger: #f38ba8;
+        }
+
+        body {
+            font-family: 'Press Start 2P', monospace;
+            background-color: #11111b;
+            color: var(--ui-text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        .pixel-borders {
+            box-shadow: 
+                -4px 0 0 0 var(--ui-border),
+                4px 0 0 0 var(--ui-border),
+                0 -4px 0 0 var(--ui-border),
+                0 4px 0 0 var(--ui-border),
+                -4px -4px 0 0 var(--ui-border),
+                4px -4px 0 0 var(--ui-border),
+                -4px 4px 0 0 var(--ui-border),
+                4px 4px 0 0 var(--ui-border);
+            border: 2px solid var(--ui-bg);
+            background-color: var(--ui-bg);
+        }
+
+        .btn-pixel {
+            background-color: #313244;
+            color: var(--ui-text);
+            padding: 10px 15px;
+            cursor: pointer;
+            transition: transform 0.1s;
+            text-align: center;
+            font-size: 0.8rem;
+            line-height: 1.5;
+        }
+
+        .btn-pixel:hover {
+            background-color: #45475a;
+        }
+
+        .btn-pixel:active {
+            transform: scale(0.95);
+        }
+
+        .btn-pixel.selected {
+            background-color: var(--primary);
+            color: #11111b;
+        }
+
+        #game-container {
+            width: 100vw;
+            height: 100dvh;
+            max-width: 1200px;
+            max-height: 900px;
+            position: relative;
+            background-color: #000;
+            display: flex;
+            flex-direction: column;
+            padding: 2vmin;
+            box-sizing: border-box;
+        }
+
+        @media (min-width: 768px) {
+            #game-container {
+                width: 95vw;
+                height: 95vh;
+            }
+        }
+
+        /* Screens */
+        .screen { display: none; height: 100%; flex-direction: column; gap: 10px; }
+        .screen.active { display: flex; }
+
+        /* Scenery Backgrounds using CSS */
+        .bg-lab { 
+            background:
+                linear-gradient(to bottom, #e2e8f0 40%, #a0aec0 40%, #a0aec0 45%, transparent 45%), /* Wall and counter */
+                repeating-conic-gradient(#edf2f7 0% 25%, #cbd5e0 0% 50%) 50% / 20px 20px; /* Tiled floor */
+            border-bottom: 20px solid #4a5568; 
+        }
+        .bg-garden { 
+            background:
+                radial-gradient(circle at 10% 20%, #f6e05e 10%, transparent 12%), /* Sun */
+                radial-gradient(ellipse at 50% 60%, #48bb78 50%, transparent 50%), /* Hill */
+                linear-gradient(to bottom, #63b3ed 60%, #8b4513 60%); /* Sky and Dirt */
+            border-bottom: 20px solid #5c2c09; 
+        }
+        .bg-classroom { 
+            background:
+                linear-gradient(to bottom, #fefcbf 10%, #276749 10%, #276749 50%, #d69e2e 50%); /* Wall, Chalkboard, Floor */
+            border-bottom: 20px solid #8b4513; 
+        }
+        .bg-gym { 
+            background:
+                linear-gradient(to bottom, #e2e8f0 40%, #c53030 40%, #c53030 45%, #ecc94b 45%), /* Wall, padding, floor */
+                repeating-linear-gradient(90deg, transparent, transparent 30px, rgba(0,0,0,0.05) 30px, rgba(0,0,0,0.05) 32px); /* Floor boards */
+            border-bottom: 20px solid #b7791f; 
+        }
+        .bg-kitchen { 
+            background:
+                linear-gradient(to bottom, #fed7aa 30%, #fb923c 30%, #fb923c 35%, transparent 35%), /* Wall & Counter */
+                repeating-conic-gradient(#fff 0% 25%, #1a202c 0% 50%) 50% / 30px 30px; /* B&W Tiles */
+            border-bottom: 20px solid #2d3748; 
+        }
+        .bg-outdoor { 
+            background:
+                linear-gradient(90deg, transparent 20%, #718096 20%, #718096 22%, transparent 22%, transparent 78%, #718096 78%, #718096 80%, transparent 80%), /* Poles */
+                linear-gradient(to bottom, #4299e1 60%, #48bb78 60%); /* Sky and grass */
+            border-bottom: 20px solid #2f855a; 
+        }
+
+        #hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 20;
+            display: none;
+            flex-direction: column;
+            gap: 5px;
+            pointer-events: none;
+        }
+
+        .hud-box {
+            background-color: rgba(30, 30, 46, 0.9);
+            border: 2px solid var(--ui-border);
+            color: white;
+            font-size: 0.5rem;
+            padding: 5px;
+            width: 140px;
+            opacity: 0.4;
+            transition: all 0.5s ease;
+        }
+
+        .hud-box.unlocked {
+            opacity: 1;
+            border-color: var(--success);
+            background-color: #313244;
+        }
+
+        .hud-value {
+            color: var(--primary);
+            font-size: 0.45rem;
+            margin-top: 4px;
+            word-wrap: break-word;
+            line-height: 1.4;
+        }
+
+        #scene-view {
+            flex-grow: 1;
+            position: relative;
+            margin-bottom: 0;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            overflow: hidden;
+            min-height: 20vh;
+        }
+
+        #character-sprite {
+            font-size: clamp(3rem, 15vmin, 6rem);
+            line-height: 1;
+            margin-bottom: 10px;
+            filter: drop-shadow(4px 4px 0px rgba(0,0,0,0.5));
+            animation: bounce 2s infinite ease-in-out;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        #item-sprite {
+            font-size: clamp(2.5rem, 12vmin, 5rem);
+            position: absolute;
+            bottom: 10%;
+            right: 20%;
+            filter: drop-shadow(4px 4px 0px rgba(0,0,0,0.5));
+        }
+
+        #dialogue-box {
+            height: 140px;
+            flex-shrink: 0;
+            position: relative;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #speaker-name {
+            color: var(--primary);
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        #dialogue-text {
+            font-size: 0.8rem;
+            line-height: 1.6;
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+
+        #choices-container {
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+            position: relative;
+            width: 100%;
+            z-index: 10;
+            flex-shrink: 0;
+        }
+
+        .choice-btn {
+            background-color: var(--ui-bg);
+            border: 4px solid var(--ui-border);
+            color: white;
+            padding: 12px;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.7rem;
+            cursor: pointer;
+            text-align: left;
+        }
+        
+        .choice-btn:hover { background-color: #313244; }
+
+        .blinking-cursor::after {
+            content: '▼';
+            display: inline-block;
+            margin-left: 5px;
+            animation: blink 1s step-end infinite;
+            color: var(--primary);
+        }
+
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+        input[type="text"] {
+            background: transparent;
+            border: none;
+            border-bottom: 4px solid var(--ui-border);
+            color: white;
+            font-family: inherit;
+            font-size: 1.2rem;
+            text-align: center;
+            padding: 10px;
+            outline: none;
+            width: 80%;
+            max-width: 300px;
+            margin-bottom: 20px;
+        }
+
+        #mute-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        .flash-correct { animation: flashGreen 0.5s; }
+        .flash-wrong { animation: flashRed 0.5s; }
+
+        @keyframes flashGreen { 0%, 100% { background-color: var(--ui-bg); } 50% { background-color: var(--success); } }
+        @keyframes flashRed { 0%, 100% { background-color: var(--ui-bg); } 50% { background-color: var(--danger); } }
+
+        #certificate {
+            background: #fdf6e3;
+            color: #073642;
+            padding: 20px;
+            border: 8px solid #b58900;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+        }
+
+        .cert-title { font-size: 1.5rem; color: #cb4b16; margin-bottom: 20px; text-shadow: none;}
+        .cert-text { font-size: 0.8rem; line-height: 2; margin-bottom: 20px; text-shadow: none; font-family: monospace;}
+        .signature { font-family: 'Brush Script MT', cursive, sans-serif; font-size: 2rem; color: #268bd2; margin-top: 10px; text-shadow: none;}
+
+        @media (max-width: 600px) {
+            html { font-size: 12px; }
+            #dialogue-box { height: 140px; }
+            .choice-btn { padding: 10px; font-size: 0.65rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container" class="pixel-borders">
+        <button id="mute-btn" onclick="toggleMute()">🔊</button>
+
+        <!-- Heads Up Display (HUD) for Learned Variables -->
+        <div id="hud">
+            <div id="hud-indep" class="hud-box">INDEPENDENT<div class="hud-value" id="val-indep">???</div></div>
+            <div id="hud-dep" class="hud-box">DEPENDENT<div class="hud-value" id="val-dep">???</div></div>
+            <div id="hud-ctrl" class="hud-box">CONTROL<div class="hud-value" id="val-ctrl">???</div></div>
+        </div>
+
+        <!-- Screen 1: Start -->
+        <div id="screen-start" class="screen active justify-center items-center">
+            <h1 class="text-2xl md:text-4xl text-center text-blue-300 mb-8 leading-relaxed" style="text-shadow: 4px 4px 0 #000;">FAIR TEST<br>QUEST</h1>
+            <button class="btn-pixel pixel-borders text-xl px-8 py-4 mt-4" onclick="startIntro()">PLAY</button>
+        </div>
+
+        <!-- Screen 1.5: Name Input -->
+        <div id="screen-name" class="screen justify-center items-center">
+            <h2 class="text-xl mb-8 text-center text-yellow-300">New Scientist Registration</h2>
+            <p class="mb-4 text-sm text-center">Enter your scientist name:</p>
+            <input type="text" id="player-name" placeholder="Name..." maxlength="10">
+            <button class="btn-pixel pixel-borders text-xl px-8 py-4 mt-4" onclick="goToTeacherSelect()">NEXT</button>
+        </div>
+
+        <!-- Screen 2: Choose Teacher -->
+        <div id="screen-teacher" class="screen justify-center items-center">
+            <h2 class="text-xl mb-8 text-center text-yellow-300">Choose Your Mentor</h2>
+            <div class="grid grid-cols-2 gap-6 w-full max-w-md px-4">
+                <button class="btn-pixel pixel-borders flex flex-col items-center p-4 teacher-btn" onclick="selectTeacher('Ms. Winnie', '👩‍🏫')">
+                    <span class="text-4xl mb-2">👩‍🏫</span> Ms. Winnie
+                </button>
+                <button class="btn-pixel pixel-borders flex flex-col items-center p-4 teacher-btn" onclick="selectTeacher('Ms. Nikka', '👩‍🔬')">
+                    <span class="text-4xl mb-2">👩‍🔬</span> Ms. Nikka
+                </button>
+                <button class="btn-pixel pixel-borders flex flex-col items-center p-4 teacher-btn" onclick="selectTeacher('Sir Angelo', '👨‍🏫')">
+                    <span class="text-4xl mb-2">👨‍🏫</span> Sir Angelo
+                </button>
+                <button class="btn-pixel pixel-borders flex flex-col items-center p-4 teacher-btn" onclick="selectTeacher('Ms. Hannah', '👩‍🎓')">
+                    <span class="text-4xl mb-2">👩‍🎓</span> Ms. Hannah
+                </button>
+            </div>
+        </div>
+
+        <!-- Screen 3: Main Game/Dialogue -->
+        <div id="screen-game" class="screen">
+            <div id="scene-view" class="pixel-borders bg-lab">
+                <div id="character-sprite">👩‍🏫</div>
+                <div id="item-sprite"></div>
+            </div>
+            
+            <div id="choices-container">
+                <!-- Choices injected here -->
+            </div>
+
+            <div id="dialogue-box" class="pixel-borders" onclick="advanceDialogue()">
+                <div id="speaker-name">Speaker</div>
+                <div id="dialogue-text">Dialogue text goes here...</div>
+            </div>
+        </div>
+
+        <!-- Screen Test: Final Assessment -->
+        <div id="screen-test" class="screen justify-center items-center px-4">
+            <h2 class="text-xl md:text-2xl mb-4 text-center text-yellow-300" style="text-shadow: 2px 2px 0 #000;">Final Assessment</h2>
+            <div class="text-xs md:text-sm text-center mb-4 text-blue-300" id="test-progress">Question 1 of 3</div>
+            <div class="w-full max-w-lg bg-gray-800 p-6 border-4 border-gray-400 mb-2 shadow-lg rounded-sm">
+                <p id="test-scenario" class="text-xs md:text-sm mb-6 leading-relaxed text-white"></p>
+                <div id="test-form" class="flex flex-col gap-4">
+                    <!-- Dropdowns injected here -->
+                </div>
+            </div>
+            <div id="test-feedback" class="text-xs md:text-sm text-red-400 text-center h-12 flex items-center justify-center font-sans font-bold"></div>
+            <button class="btn-pixel pixel-borders text-lg px-8 py-3 mt-2" onclick="submitTest()">SUBMIT</button>
+        </div>
+
+        <!-- Screen 4: Certificate -->
+        <div id="screen-cert" class="screen">
+            <div id="certificate">
+                <div class="cert-title">CERTIFICATE OF MASTERY</div>
+                <div class="cert-text">
+                    This certifies that<br><br>
+                    <span id="cert-name" class="text-xl text-blue-600 font-bold" style="font-family: 'Press Start 2P', monospace;">PLAYER</span><br><br>
+                    has successfully completed training in<br>
+                    <strong>Scientific Fair Testing</strong><br>
+                    and understands Independent, Dependent,<br>
+                    and Control Variables.
+                </div>
+                <div class="mt-8">
+                    <p class="text-xs text-gray-500 mb-1">Certified by:</p>
+                    <div id="cert-sign" class="signature">Ms. Winnie</div>
+                </div>
+                <button class="btn-pixel pixel-borders mt-8 text-black" onclick="location.reload()" style="font-family: 'Press Start 2P', monospace; font-size: 0.6rem;">Play Again</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- State Variables ---
+        let playerName = "Player";
+        let teacherName = "";
+        let teacherEmoji = "";
+        let currentStep = 0;
+        let isTyping = false;
+        let dialogueTimeout;
+        let currentFullText = "";
+        let awaitingQuiz = false;
+        let requireRetry = false; // Add retry flag for wrong answers
+
+        // --- Audio System (Web Audio API for retro synth) ---
+        let audioCtx;
+        let isMuted = false;
+        let nextNoteTime = 0;
+        let currentNote = 0;
+        let audioTimer;
+        
+        // Simple retro melody
+        const melody = [
+            { note: 261.63, duration: 0.2 }, // C4
+            { note: 329.63, duration: 0.2 }, // E4
+            { note: 392.00, duration: 0.4 }, // G4
+            { note: 261.63, duration: 0.2 }, // C4
+            { note: 392.00, duration: 0.2 }, // G4
+            { note: 329.63, duration: 0.6 }, // E4
+            { note: null, duration: 0.2 }    // Rest
+        ];
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            scheduleAudio();
+        }
+
+        function playTone(freq, duration, time) {
+            if (isMuted || !freq) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'square'; // Retro sound
+            osc.frequency.value = freq;
+            
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            osc.start(time);
+        gain.gain.setValueAtTime(0.05, time); // Low volume
+        gain.gain.exponentialRampToValueAtTime(0.001, time + duration - 0.05);
+        osc.stop(time + duration);
+    }
+
+    function playSuccessSound() {
+        if (isMuted || !audioCtx) return;
+        const t = audioCtx.currentTime;
+        // A happy, ascending "correct" chime
+        playTone(523.25, 0.1, t);        // C5
+        playTone(659.25, 0.1, t + 0.1);  // E5
+        playTone(783.99, 0.15, t + 0.2); // G5
+        playTone(1046.50, 0.3, t + 0.35); // C6
+    }
+
+    function scheduleAudio() {
+            if (!audioCtx) return;
+            const lookahead = 0.1; 
+            while (nextNoteTime < audioCtx.currentTime + lookahead) {
+                const currentStepData = melody[currentNote];
+                playTone(currentStepData.note, currentStepData.duration, nextNoteTime);
+                nextNoteTime += currentStepData.duration;
+                currentNote = (currentNote + 1) % melody.length;
+            }
+            audioTimer = requestAnimationFrame(scheduleAudio);
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            document.getElementById('mute-btn').innerText = isMuted ? '🔇' : '🔊';
+        }
+
+        // --- Story Data ---
+        let storyData = [];
+
+        function buildStory() {
+            storyData = [
+                // Intro
+                { type: 'scene', bg: 'bg-lab', char: teacherEmoji, item: '' },
+                { type: 'd', speaker: teacherName, text: `Welcome to the Science Lab, ${playerName}!` },
+                { type: 'd', speaker: teacherName, text: "Today we are learning about FAIR TESTING." },
+                { type: 'd', speaker: teacherName, text: "To make an experiment fair, we must understand VARIABLES. These are things that can change." },
+                { type: 'd', speaker: teacherName, text: "1. INDEPENDENT Variable: The ONE thing we change on purpose to test it.", action: 'unlock-indep' },
+                { type: 'd', speaker: teacherName, text: "2. DEPENDENT Variable: The thing we measure or observe as the result.", action: 'unlock-dep' },
+                { type: 'd', speaker: teacherName, text: "3. CONTROL Variables: Everything else we must keep exactly the SAME so the test is fair.", action: 'unlock-ctrl' },
+                { type: 'd', speaker: teacherName, text: "Let's investigate 5 situations to practice!" },
+                
+                // Situation 1: Tomato
+                { type: 'scene', bg: 'bg-garden', char: teacherEmoji, item: '🍅' },
+                { type: 'd', speaker: teacherName, text: "Situation 1: The Tomato Plants." },
+                { type: 'd', speaker: teacherName, text: "We want to know: Do tomato plants grow taller in sunlight or in the dark?" },
+                { type: 'd', speaker: teacherName, text: "We put one plant in the sun, and an identical plant in a dark closet." },
+                { type: 'q', speaker: teacherName, text: "What is the ONE thing we change on purpose?", 
+                  options: ["Amount of water", "Amount of sunlight", "Type of soil"], correct: 1, 
+                  feedback: "Correct! We purposely change the sunlight. This is the INDEPENDENT variable.",
+                  wrongFeedback: [
+                      "Guide: If we change the water, we wouldn't know if the sun caused the growth. We must keep water the same.", 
+                      "", 
+                      "Guide: We are testing sunlight, not the soil! Soil should be kept the same."
+                  ] },
+                { type: 'q', speaker: teacherName, text: "What must we keep exactly the SAME to be fair?", 
+                  options: ["The sunlight", "Where we measure it", "The amount of water and soil"], correct: 2, 
+                  feedback: "Right! We control water and soil so only sunlight affects growth. These are CONTROL variables.",
+                  wrongFeedback: [
+                      "Guide: Sunlight is what we are purposely changing! What things should we NOT change?", 
+                      "Guide: While true, what about the things the plant needs to live? We must keep those fair.", 
+                      ""
+                  ] },
+                { type: 'd', speaker: teacherName, text: "And the plant's height is what we measure, so it's the DEPENDENT variable!" },
+
+                // Situation 2: Paper Planes
+                { type: 'scene', bg: 'bg-classroom', char: teacherEmoji, item: '✈️' },
+                { type: 'd', speaker: teacherName, text: "Situation 2: The Paper Airplanes." },
+                { type: 'd', speaker: teacherName, text: "We are making planes to see which type of paper flies the furthest." },
+                { type: 'd', speaker: teacherName, text: "We make one plane with normal paper, and one with heavy cardboard." },
+                { type: 'q', speaker: teacherName, text: "What are we measuring to see the result?", 
+                  options: ["The color of paper", "The distance flown", "How hard we throw"], correct: 1, 
+                  feedback: "Yes! Distance flown is what we measure. This is the DEPENDENT variable.",
+                  wrongFeedback: [
+                      "Guide: Color doesn't tell us how well the plane flies. What are we trying to observe?", 
+                      "", 
+                      "Guide: How hard we throw is something we should keep the same (Control) so it's a fair race."
+                  ] },
+                { type: 'q', speaker: teacherName, text: "What is the INDEPENDENT variable here?", 
+                  options: ["The type of paper", "The wind speed", "The shape of the plane"], correct: 0, 
+                  feedback: "Correct! We purposely change the type of paper to test it.",
+                  wrongFeedback: [
+                      "", 
+                      "Guide: Wind speed is out of our control or kept the same. What did we intentionally swap?", 
+                      "Guide: We kept the shape the same! Think about what material we changed."
+                  ] },
+                { type: 'd', speaker: teacherName, text: "To make it a fair test, we must use the same plane design and throw with the same force (Controls)!" },
+
+                // Situation 3: Bouncy Ball
+                { type: 'scene', bg: 'bg-gym', char: teacherEmoji, item: '🏀' },
+                { type: 'd', speaker: teacherName, text: "Situation 3: The Bouncy Ball." },
+                { type: 'd', speaker: teacherName, text: "Does dropping a rubber ball from a higher point make it bounce higher?" },
+                { type: 'd', speaker: teacherName, text: "We drop the same ball on the same floor from 1 meter, then 2 meters." },
+                { type: 'q', speaker: teacherName, text: "Identify the DEPENDENT variable.", 
+                  options: ["Drop height", "Bounce height", "Floor type"], correct: 1, 
+                  feedback: "Exactly! Bounce height is what happens as a result.",
+                  wrongFeedback: [
+                      "Guide: The drop height is what we change on purpose. What happens as a result of that drop?", 
+                      "", 
+                      "Guide: We kept the floor the same! We are measuring the result of the bounce."
+                  ] },
+                { type: 'q', speaker: teacherName, text: "Which of these should be a CONTROL variable?", 
+                  options: ["Using different balls", "Dropping from different heights", "Dropping on the same floor"], correct: 2, 
+                  feedback: "Spot on! The floor and ball must be controlled (kept the same).",
+                  wrongFeedback: [
+                      "Guide: Using different balls would make it an unfair test! We need to keep things the SAME.", 
+                      "Guide: We purposely change the drop height to test it. That is the independent variable.", 
+                      ""
+                  ] },
+                { type: 'd', speaker: teacherName, text: "The drop height is what we change on purpose, so it is independent." },
+
+                // Situation 4: Cocoa Powder
+                { type: 'scene', bg: 'bg-kitchen', char: teacherEmoji, item: '☕' },
+                { type: 'd', speaker: teacherName, text: "Situation 4: Mixing Cocoa Powder." },
+                { type: 'd', speaker: teacherName, text: "We want to know: Does cocoa powder dissolve faster in cold water or hot water?" },
+                { type: 'd', speaker: teacherName, text: "We use 2 tablespoons of cocoa powder for both cups, but one cup has hot water and the other has cold." },
+                { type: 'q', speaker: teacherName, text: "What is the INDEPENDENT variable?", 
+                  options: ["Amount of cocoa powder", "Temperature of water", "Time to dissolve"], correct: 1, 
+                  feedback: "Correct! The water temperature is what we changed on purpose.",
+                  wrongFeedback: [
+                      "Guide: We used 2 tablespoons for both! What is the difference between the two cups?", 
+                      "", 
+                      "Guide: Time is what we are measuring as a result. What did we change before starting?"
+                  ] },
+                { type: 'q', speaker: teacherName, text: "What is the DEPENDENT variable?", 
+                  options: ["Time to dissolve", "Type of cup", "Amount of water"], correct: 0, 
+                  feedback: "Right! We are measuring how fast it dissolves.",
+                  wrongFeedback: [
+                      "", 
+                      "Guide: The cup type should be the same. What are we waiting to see happen?", 
+                      "Guide: We control the amount of water. What are we measuring with a stopwatch?"
+                  ] },
+                { type: 'd', speaker: teacherName, text: "The amount of cocoa powder and water must be kept exactly the same (Control) for a fair test!" },
+
+                // Situation 5: Sampayan (Filipino Example)
+                { type: 'scene', bg: 'bg-outdoor', char: teacherEmoji, item: '👕' },
+                { type: 'd', speaker: teacherName, text: "Situation 5: Ang Sampayan." },
+                { type: 'd', speaker: teacherName, text: "Does your school uniform dry faster under direct sunlight or in the shade?" },
+                { type: 'd', speaker: teacherName, text: "We hang one wet uniform in the sun, and another identical wet uniform in the shade." },
+                { type: 'q', speaker: teacherName, text: "Identify the CONTROL variables.", 
+                  options: ["Drying time", "Location (Sun vs Shade)", "Type of uniform and wetness"], correct: 2, 
+                  feedback: "Exactly! The uniforms must be the same material and equally wet.",
+                  wrongFeedback: [
+                      "Guide: Drying time is what we measure at the end! What do we need to make sure is identical at the start?", 
+                      "Guide: Location is what we change on purpose to test. What must be kept identical?", 
+                      ""
+                  ] },
+                { type: 'q', speaker: teacherName, text: "Identify the INDEPENDENT variable.", 
+                  options: ["Location (Sun vs Shade)", "Type of uniform", "Drying time"], correct: 0, 
+                  feedback: "Spot on! We purposely changed the location.",
+                  wrongFeedback: [
+                      "", 
+                      "Guide: We made sure the uniforms are identical! What is the main difference in how we hung them?", 
+                      "Guide: Drying time is our result. What did we decide to do differently to test it?"
+                  ] },
+                { type: 'd', speaker: teacherName, text: "The time it takes to dry is what we measure, so it is the dependent variable." },
+
+                // Transition to Test
+                { type: 'scene', bg: 'bg-lab', char: teacherEmoji, item: '📝' },
+                { type: 'd', speaker: teacherName, text: `Amazing job analyzing those 5 situations, ${playerName}!` },
+                { type: 'd', speaker: teacherName, text: "Now it's time for your Final Assessment. You must correctly label 3 scenarios to get your certificate!" },
+                { type: 'test' }
+            ];
+        }
+
+        // --- Game Flow Logic ---
+
+        function switchScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        function startIntro() {
+            // Init audio on first user interaction
+            initAudio(); 
+            if(audioCtx && audioCtx.state === 'running') {
+                nextNoteTime = audioCtx.currentTime + 0.1;
+            }
+
+            // Set the intro story sequence
+            storyData = [
+                { type: 'scene', bg: 'bg-garden', char: '🧑‍🌾', item: '🥀' },
+                { type: 'd', speaker: 'Leo', text: "Oh no! What happened to my plant?" },
+                { type: 'scene', bg: 'bg-garden', char: '👧', item: '🌱' },
+                { type: 'd', speaker: 'Mia', text: "Look at mine, Leo! It grew so tall and healthy." },
+                { type: 'scene', bg: 'bg-garden', char: '🧑‍🌾', item: '🥀' },
+                { type: 'd', speaker: 'Leo', text: "I don't understand. I wanted to see if plants grow better with music..." },
+                { type: 'd', speaker: 'Leo', text: "But I forgot to water it, and now it's withered!" },
+                { type: 'scene', bg: 'bg-garden', char: '👧', item: '🌱' },
+                { type: 'd', speaker: 'Mia', text: "Wait... you gave it music, but no water? Did you do a FAIR TEST?" },
+                { type: 'scene', bg: 'bg-garden', char: '🧑‍🌾', item: '🥀' },
+                { type: 'd', speaker: 'Leo', text: "A fair test? What's a fair test?" },
+                { type: 'scene', bg: 'bg-garden', char: '👧', item: '🌱' },
+                { type: 'd', speaker: 'Mia', text: "It's how scientists make sure their experiments give the correct answers." },
+                { type: 'd', speaker: 'Mia', text: "Let's go to the science lab and ask a teacher about it!" },
+                { type: 'ask-name' }
+            ];
+            
+            currentStep = 0;
+            document.getElementById('hud').style.display = 'none';
+            switchScreen('screen-game');
+            renderStep();
+        }
+
+        function goToTeacherSelect() {
+            const input = document.getElementById('player-name').value.trim();
+            if (input) playerName = input;
+            switchScreen('screen-teacher');
+        }
+
+        function selectTeacher(name, emoji) {
+            teacherName = name;
+            teacherEmoji = emoji;
+            buildStory();
+            currentStep = 0; // Reset step counter for the main game
+            document.getElementById('hud').style.display = 'flex'; // Show HUD
+            switchScreen('screen-game');
+            renderStep();
+        }
+
+        function renderStep() {
+            if (currentStep >= storyData.length) return;
+            const step = storyData[currentStep];
+
+            if (step.action) {
+                if (step.action === 'unlock-indep') {
+                    document.getElementById('hud-indep').classList.add('unlocked');
+                    document.getElementById('val-indep').innerText = "What we CHANGE";
+                }
+                if (step.action === 'unlock-dep') {
+                    document.getElementById('hud-dep').classList.add('unlocked');
+                    document.getElementById('val-dep').innerText = "What we MEASURE";
+                }
+                if (step.action === 'unlock-ctrl') {
+                    document.getElementById('hud-ctrl').classList.add('unlocked');
+                    document.getElementById('val-ctrl').innerText = "What we KEEP SAME";
+                }
+            }
+
+            if (step.type === 'scene') {
+                const sceneView = document.getElementById('scene-view');
+                sceneView.className = `pixel-borders ${step.bg}`;
+                document.getElementById('character-sprite').innerText = step.char;
+                document.getElementById('item-sprite').innerText = step.item;
+                currentStep++;
+                renderStep(); // Immediately process next dialogue/quiz
+                return;
+            }
+
+            if (step.type === 'ask-name') {
+                switchScreen('screen-name');
+                return;
+            }
+
+            if (step.type === 'test') {
+                document.getElementById('hud').style.display = 'none'; // Hide HUD
+                initTest();
+                return;
+            }
+
+            if (step.type === 'end') {
+                document.getElementById('hud').style.display = 'none';
+                showCertificate();
+                return;
+            }
+
+            // Setup Dialogue Box
+            document.getElementById('speaker-name').innerText = step.speaker;
+            const textElement = document.getElementById('dialogue-text');
+            textElement.innerHTML = '';
+            textElement.classList.remove('blinking-cursor');
+            document.getElementById('choices-container').style.display = 'none';
+            awaitingQuiz = false;
+
+            if (step.type === 'd') {
+                typeText(step.text, () => {
+                    textElement.classList.add('blinking-cursor');
+                });
+            } else if (step.type === 'q') {
+                typeText(step.text, () => {
+                    showChoices(step);
+                });
+            }
+        }
+
+        function typeText(text, callback) {
+            isTyping = true;
+            currentFullText = text;
+            let i = 0;
+            const textEl = document.getElementById('dialogue-text');
+            textEl.innerHTML = '';
+            clearTimeout(dialogueTimeout);
+
+            function type() {
+                if (i < text.length) {
+                    textEl.innerHTML += text.charAt(i);
+                    i++;
+                    dialogueTimeout = setTimeout(type, 30); // Typing speed
+                } else {
+                    isTyping = false;
+                    if (callback) callback();
+                }
+            }
+            type();
+        }
+
+        function advanceDialogue() {
+            if (awaitingQuiz) return; // Prevent skipping quizzes
+            
+            if (isTyping) {
+                // Skip typing
+                clearTimeout(dialogueTimeout);
+                document.getElementById('dialogue-text').innerHTML = currentFullText;
+                isTyping = false;
+                
+                const step = storyData[currentStep];
+                if (step.type === 'd') {
+                    document.getElementById('dialogue-text').classList.add('blinking-cursor');
+                } else if (step.type === 'q') {
+                     showChoices(step);
+                }
+            } else {
+                if (requireRetry) {
+                    requireRetry = false;
+                    renderStep(); // Re-render the question without incrementing step
+                } else {
+                    document.getElementById('dialogue-text').classList.remove('blinking-cursor');
+                    currentStep++;
+                    renderStep();
+                }
+            }
+        }
+
+        function showChoices(step) {
+            awaitingQuiz = true;
+            const container = document.getElementById('choices-container');
+            container.innerHTML = '';
+            container.style.display = 'flex';
+
+            step.options.forEach((opt, index) => {
+                const btn = document.createElement('button');
+                btn.className = 'choice-btn';
+                btn.innerText = `> ${opt}`;
+                btn.onclick = (e) => handleChoice(index, step, btn);
+                container.appendChild(btn);
+            });
+        }
+
+        function handleChoice(selectedIndex, step, btnElement) {
+        const dialogueBox = document.getElementById('dialogue-box');
+        if (selectedIndex === step.correct) {
+            // Correct
+            playSuccessSound();
+            confetti({
+                particleCount: 100,
+                spread: 70,
+                origin: { y: 0.6 },
+                zIndex: 1000
+            });
+            
+            dialogueBox.classList.add('flash-correct');
+            setTimeout(() => dialogueBox.classList.remove('flash-correct'), 500);
+            
+            document.getElementById('choices-container').style.display = 'none';
+                awaitingQuiz = false;
+                requireRetry = false;
+                
+                // Show feedback temporarily before moving on
+                document.getElementById('dialogue-text').innerHTML = `<span style="color:var(--success)">Correct!</span> ${step.feedback}`;
+                document.getElementById('dialogue-text').classList.add('blinking-cursor');
+            } else {
+                // Wrong
+                dialogueBox.classList.add('flash-wrong');
+                setTimeout(() => dialogueBox.classList.remove('flash-wrong'), 500);
+                
+                document.getElementById('choices-container').style.display = 'none';
+                awaitingQuiz = false;
+                requireRetry = true;
+                
+                const guideText = step.wrongFeedback[selectedIndex];
+                document.getElementById('dialogue-text').innerHTML = `<span style="color:var(--danger)">Not quite!</span> ${guideText}<br><br><span style="font-size:0.6rem; color:#a0aec0;">> Click here to try again.</span>`;
+                document.getElementById('dialogue-text').classList.add('blinking-cursor');
+            }
+        }
+
+        // --- Final Test Logic ---
+        const testQuestions = [
+            {
+                scenario: "Scenario 1: You are baking bread. You want to know which oven temperature is best to bake it the fastest.",
+                items: [
+                    { label: "Temperature of the oven", answer: "independent" },
+                    { label: "Time it takes to bake the bread", answer: "dependent" },
+                    { label: "Amount of flour and yeast used", answer: "control" }
+                ]
+            },
+            {
+                scenario: "Scenario 2: Toy Car Race. You want to know on which type of floor the toy car will travel the farthest.",
+                items: [
+                    { label: "Type of floor (cement or tiles)", answer: "independent" },
+                    { label: "Distance traveled by the toy car", answer: "dependent" },
+                    { label: "Force used to push the toy car", answer: "control" }
+                ]
+            },
+            {
+                scenario: "Scenario 3: Planting Beans. You want to know if beans grow faster when fertilizer is added to the soil.",
+                items: [
+                    { label: "Amount of fertilizer in the soil", answer: "independent" },
+                    { label: "Height of the bean sprout", answer: "dependent" },
+                    { label: "Amount of water and sunlight", answer: "control" }
+                ]
+            }
+        ];
+
+        let currentTestIndex = 0;
+
+        function initTest() {
+            switchScreen('screen-test');
+            renderTestQuestion();
+        }
+
+        function renderTestQuestion() {
+            const q = testQuestions[currentTestIndex];
+            document.getElementById('test-progress').innerText = `Question ${currentTestIndex + 1} of 3 (9 Points Total)`;
+            document.getElementById('test-scenario').innerText = q.scenario;
+            document.getElementById('test-feedback').innerHTML = ''; // Reset feedback
+            
+            const form = document.getElementById('test-form');
+            form.innerHTML = '';
+            
+            // Randomize order of items visually so answers aren't always top-to-bottom
+            const shuffledItems = [...q.items].sort(() => Math.random() - 0.5);
+            
+            shuffledItems.forEach((item) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'flex flex-col md:flex-row md:items-center gap-2 justify-between bg-gray-700 p-3 border border-gray-500 rounded-sm';
+                
+                const label = document.createElement('span');
+                label.className = 'text-xs md:text-sm text-white font-sans';
+                label.innerText = item.label;
+                
+                const select = document.createElement('select');
+                select.className = 'bg-gray-900 text-white text-xs p-2 border border-blue-300 w-full md:w-auto outline-none cursor-pointer';
+                select.dataset.correct = item.answer;
+                select.innerHTML = `
+                    <option value="">-- Choose the Variable --</option>
+                    <option value="independent">Independent</option>
+                    <option value="dependent">Dependent</option>
+                    <option value="control">Control</option>
+                `;
+                
+                wrapper.appendChild(label);
+                wrapper.appendChild(select);
+                form.appendChild(wrapper);
+            });
+        }
+
+        function submitTest() {
+            const selects = document.querySelectorAll('#test-form select');
+            let allCorrect = true;
+            let hints = [];
+            
+            // Check all 3 answers for the current question
+            selects.forEach(select => {
+                if (select.value === select.dataset.correct) {
+                    select.parentElement.style.borderColor = 'var(--success)';
+                    select.parentElement.style.backgroundColor = 'rgba(166, 227, 161, 0.2)'; // Green tint
+                } else {
+                    select.parentElement.style.borderColor = 'var(--danger)';
+                    select.parentElement.style.backgroundColor = 'rgba(243, 139, 168, 0.2)'; // Red tint
+                    allCorrect = false;
+                    
+                    // Generate guiding feedback
+                    if (select.dataset.correct === 'independent' && !hints.includes('Independent')) {
+                        hints.push("Guide: Independent variable is the ONE thing we intentionally CHANGE.");
+                    }
+                    if (select.dataset.correct === 'dependent' && !hints.includes('Dependent')) {
+                        hints.push("Guide: Dependent variable is the result we MEASURE or OBSERVE.");
+                    }
+                    if (select.dataset.correct === 'control' && !hints.includes('Control')) {
+                        hints.push("Guide: Control variable is what we KEEP THE SAME to be fair.");
+                    }
+                }
+            });
+            
+            if (allCorrect) {
+                document.getElementById('test-feedback').innerHTML = `<span class="text-green-400">Perfect! Moving to next...</span>`;
+                playSuccessSound();
+                confetti({ particleCount: 150, spread: 80, origin: { y: 0.5 }, zIndex: 1000 });
+                
+                setTimeout(() => {
+                    currentTestIndex++;
+                    if (currentTestIndex < testQuestions.length) {
+                        renderTestQuestion();
+                    } else {
+                        showCertificate();
+                    }
+                }, 1500);
+            } else {
+                const formArea = document.getElementById('screen-test');
+                formArea.classList.add('flash-wrong');
+                setTimeout(() => formArea.classList.remove('flash-wrong'), 500);
+                
+                // Display the collected hints
+                document.getElementById('test-feedback').innerHTML = hints.join("<br>");
+            }
+        }
+
+        function showCertificate() {
+            document.getElementById('cert-name').innerText = playerName.toUpperCase();
+            document.getElementById('cert-sign').innerText = teacherName;
+            switchScreen('screen-cert');
+        }
+
+    </script>
+</body>
+</html>
